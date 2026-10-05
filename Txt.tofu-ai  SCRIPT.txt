@@ -1,0 +1,178 @@
+const input = document.getElementById("messageInput");
+const imageInput = document.getElementById("imageInput");
+const imageButton = document.getElementById("imageButton");
+
+imageButton.addEventListener("click", function() {
+  imageInput.click();
+});
+let selectedImage = null;
+
+imageInput.addEventListener("change", function() {
+  const file = imageInput.files[0];
+
+  if (!file) return;
+
+  selectedImage = file;
+
+  const preview = document.createElement("img");
+  preview.src = URL.createObjectURL(file);
+  preview.style.maxWidth = "120px";
+  preview.style.maxHeight = "120px";
+  preview.style.borderRadius = "12px";
+  preview.style.display = "block";
+  preview.style.margin = "8px auto";
+
+  const inputBox = document.querySelector(".input-box");
+
+  const oldPreview = document.getElementById("imagePreview");
+  if (oldPreview) oldPreview.remove();
+
+  preview.id = "imagePreview";
+  inputBox.parentElement.insertBefore(preview, inputBox);
+});
+const sendButton = document.getElementById("sendButton");
+const chat = document.getElementById("chat");
+const newChat = document.getElementById("newChat");
+
+const WORKER_URL =
+  "https://tofu-ai-backend.craigyboylawley1000.workers.dev";
+
+function addMessage(text, type) {
+  const row = document.createElement("div");
+  row.className = "message-row " + type;
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = type === "user" ? "Y" : "豆腐";
+
+  const content = document.createElement("div");
+  content.className = "message-content";
+  content.textContent = text;
+
+  row.appendChild(avatar);
+  row.appendChild(content);
+  chat.appendChild(row);
+
+  chat.scrollTop = chat.scrollHeight;
+
+  return content;
+}
+
+function typeMessage(text, content) {
+  let index = 0;
+
+  function next() {
+    if (index < text.length) {
+      content.textContent += text[index];
+      index++;
+
+      chat.scrollTop = chat.scrollHeight;
+
+      setTimeout(next, 18);
+    } else {
+      sendButton.disabled = false;
+      input.focus();
+    }
+  }
+
+  next();
+}
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
+
+async function sendMessage() {
+  const text = input.value.trim();
+if ((!text && !selectedImage) || sendButton.disabled) return;
+  
+
+  const welcome = document.querySelector(".welcome");
+
+  if (welcome) {
+    welcome.remove();
+  }
+
+  addMessage(text, "user");
+
+  input.value = "";
+  input.style.height = "auto";
+  input.value = "";
+input.style.height = "auto";
+
+sendButton.disabled = true;
+  sendButton.disabled = true;
+
+  const aiContent = addMessage("", "ai");
+
+  try {
+    const response = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+  message: text,
+  image: selectedImage ? await fileToDataURL(selectedImage) : null
+})
+    });
+
+    const data = await response.json();
+
+    if (selectedImage) {
+  selectedImage = null;
+  imageInput.value = "";
+
+  const preview = document.getElementById("imagePreview");
+  if (preview) preview.remove();
+    }
+    if (!response.ok || data.error) {
+      throw new Error(data.error || "Request failed");
+    }
+
+    typeMessage(data.reply, aiContent);
+
+  } catch (error) {
+    aiContent.textContent =
+      "Sorry, Tofu couldn't connect to its brain. 😭";
+
+    sendButton.disabled = false;
+
+    console.error(error);
+  }
+}
+
+sendButton.addEventListener("click", sendMessage);
+
+input.addEventListener("keydown", function(event) {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendMessage();
+  }
+});
+
+input.addEventListener("input", function() {
+  input.style.height = "auto";
+  input.style.height = input.scrollHeight + "px";
+});
+
+newChat.addEventListener("click", function() {
+  chat.innerHTML = `
+    <div class="welcome">
+      <div class="logo">豆腐</div>
+      <h1>How can I help?</h1>
+      <p>Ask Tofu anything.</p>
+    </div>
+  `;
+
+  input.value = "";
+  input.style.height = "auto";
+  sendButton.disabled = false;
+  input.focus();
+});
